@@ -136,6 +136,20 @@ if __name__ == "__main__":
     
     parser = argparse.ArgumentParser()
     parser.add_argument("--hours", type=float, default=1.0, help="분석할 최근 N시간")
+    parser.add_argument("--loop", action="store_true", help="지정된 간격으로 무한 반복 실행 (데몬 모드)")
+    parser.add_argument("--interval", type=int, default=5, help="반복 실행 간격 (분 단위, 기본 5분)")
     args = parser.parse_args()
     
-    run_coach_pipeline(hours=args.hours)
+    if args.loop:
+        import time
+        print(f"🔄 실시간 AI 코치 데몬 모드 시작 (실행 주기: {args.interval}분)")
+        while True:
+            try:
+                run_coach_pipeline(hours=args.hours)
+            except Exception as e:
+                print(f"❌ 파이프라인 실행 중 오류 발생: {e}")
+            
+            print(f"⏳ 다음 분석까지 {args.interval}분 대기 중...")
+            time.sleep(args.interval * 60)
+    else:
+        run_coach_pipeline(hours=args.hours)
