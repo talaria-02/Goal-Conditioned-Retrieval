@@ -51,14 +51,13 @@ class GeminiLLMClient(BaseLLMClient):
         api_key: str | None = None,
         model_name: str = "gemini-3.1-flash-lite",
         temperature: float = 0.2,
-        max_output_tokens: int = 512,
+        max_output_tokens: int = 8192,
     ) -> None:
         try:
-            from google import genai
-            from google.genai import types
+            import google.generativeai as genai
         except ImportError as e:
             raise ImportError(
-                "google-genai is not installed. Run: pip install google-genai"
+                "google-generativeai is not installed. Run: pip install google-generativeai"
             ) from e
 
         key = api_key or os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
@@ -67,20 +66,24 @@ class GeminiLLMClient(BaseLLMClient):
                 "Gemini API key not found. Set GEMINI_API_KEY environment variable."
             )
 
-        self._client = genai.Client(api_key=key)
-        self._model_name = model_name
-        self._config = types.GenerateContentConfig(
+        genai.configure(api_key=key)
+        
+        # 사용자가 .env에 설정한 모델명을 가져오되, 앞뒤 따옴표를 확실히 제거합니다.
+        env_model = os.environ.get("GEMINI_MODEL", "")
+        self._model_name = env_model.strip("\"'") if env_model else model_name
+        
+        self._model = genai.GenerativeModel(self._model_name)
+        
+        self._generation_config = genai.types.GenerationConfig(
             temperature=temperature,
             max_output_tokens=max_output_tokens,
         )
-        logger.info("GeminiLLMClient initialized (model=%s)", model_name)
+        logger.info("GeminiLLMClient initialized (model=%s)", self._model_name)
 
     def generate(self, prompt: str, **kwargs: Any) -> str:
-        from google.genai import types
-        resp = self._client.models.generate_content(
-            model=self._model_name,
-            contents=prompt,
-            config=self._config,
+        resp = self._model.generate_content(
+            prompt,
+            generation_config=self._generation_config,
         )
         return resp.text
 

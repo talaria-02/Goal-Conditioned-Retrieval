@@ -300,129 +300,42 @@ _EXPANSION_PROMPT = """
 
 이 시스템은 다음과 같은 특징을 가집니다.
 
-1. 검색 대상은 "문서"가 아니라 사용자의 실제 행동 로그이다.
+1. 검색 대상은 사용자의 "컴퓨터 실제 활동 로그"이며, 이는 두 가지 형태의 텍스트가 섞여 있습니다.
+   [형태 A: 원시 로그] 프로세스명(exe), 앱 이름, 영문 창 제목, 도메인명, 파일 확장자.
+   (예: "League of Legends.exe", "Code.exe", "github.com", ".py", "VSCode")
+   [형태 B: AI 요약 로그] AI가 행동을 한국어로 요약한 자연어 문장.
+   (예: "대시보드 인터페이스 확인", "게임 플레이하며 여가 활동", "기술 자료 조사", "유튜브 영상 시청", "AI 분석 시스템 설계")
 
-예시:
+2. 따라서 당신이 생성하는 vocabulary는 반드시 **[형태 A]의 영문 키워드와 [형태 B]의 한글 행동 명사구를 5:5 비율로 혼합**하여 생성해야 합니다.
 
-* "연구계획서 초안 작성"
-* "교수님께 컨택 메일 보냄"
-* "토익 LC 2회분 풂"
-* "헬스장 가서 하체 운동"
-* "친구와 저녁 식사"
-
-2. 사용자는 목표를 직접 언급하지 않을 수 있다.
-
-예시:
-
-목표:
-"대학원 진학 준비"
-
-실제 로그:
-
-* "교수님 컨택 메일 작성"
-* "CV 수정"
-* "논문 2편 읽음"
-
-이러한 로그는 목표와 관련된 것으로 판단해야 한다.
-
-3. retrieval 단계는 recall 중심이다.
-
-따라서 관련 로그를 최대한 놓치지 않도록 vocabulary를 생성해야 한다.
-
-4. negative_terms는 블랙리스트가 아니다.
-
-negative_terms는 목표와 충돌하는 다른 생활 도메인을 나타내는 용도이다.
-
-priority_terms나 evidence_terms가 함께 존재할 경우 해당 로그는 여전히 관련 로그일 수 있다.
+3. retrieval 단계는 recall 중심입니다. 관련 로그를 최대한 놓치지 않도록 실제 화면이나 요약문에 등장할 텍스트 조각(Substring)을 예측하세요.
 
 ========================
 [생성 규칙]
 =======
 
 1. priority_terms
-
-* 목표를 가장 강하게 식별할 수 있는 표현
-* 실제 로그에 등장할 수 있는 phrase 중심
-* 사람, 장소, 산출물, 행동 포함
-* 6~12개 생성
-
-예:
-"연구계획서 작성"
-"교수님 컨택"
-"토익 모의고사 풀이"
+* 목표를 가장 강력하게 식별할 수 있는 핵심 키워드 (프로젝트 이름, 핵심 앱/도메인, 게임 이름 등 영문과 한글 혼합)
+* 3~5개 생성
+예: "League of Legends.exe", "Goal-Conditioned-Retrieval", "파이썬 알고리즘", "github.com", "자료 조사"
 
 2. evidence_terms
-
-* 목표 달성을 위해 직접 수행하는 활동
-* 실제 행동 로그 수준으로 생성
-* 10~20개 생성
-
-예:
-"논문 읽기"
-"CV 수정"
-"영어 면접 연습"
+* 목표 달성을 위해 직접 수행할 때 로그에 찍히는 영문 프로그램/도메인명과 한글 요약 명사구
+* 5~8개 생성
+예: "Code.exe", ".py", "acmicpc.net", "웹서핑을 병행", "대시보드 인터페이스", "영상 시청"
 
 3. related_terms
-
-* 간접 관련 행동
-* 목표 진행 상황을 암시하는 표현
-* 8~15개 생성
-
-예:
-"세미나 참석"
-"발표 자료 정리"
+* 목표 진행 상황을 간접적으로 암시하는 표현 (서브 도메인, 간접 요약 구문)
+* 3~5개 생성
+예: "Stack Overflow", "구글에서 자료 조사", "Notion", "문서 작성"
 
 4. negative_terms
+* 목표와 정반대되거나 섞이기 쉬운 다른 생활 영역의 구체적 로그 텍스트 (예: 여가 목표인데 코딩 앱이 찍히거나, 코딩 목표인데 게임이 찍히는 경우)
+* 5~8개 생성
+예: "League of Legends", "Netflix", "주식 투자", "쇼핑몰", "Program Manager"
 
-* retrieval에서 자주 섞일 수 있는 다른 생활 영역
-* 목표와 의미적으로 혼동될 수 있는 도메인 포함
-* phrase 중심
-* 10~20개 생성
-
-예:
-"주식 투자 공부"
-"헬스장 운동"
-"게임 플레이"
-"여행 계획 세우기"
-"소개팅 준비"
-
-5. 반드시 phrase 우선
-
-좋은 예:
-
-* "교수님 컨택 메일 작성"
-* "토익 LC 풀이"
-* "연구실 방문"
-
-나쁜 예:
-
-* "메일"
-* "공부"
-* "연구"
-
-6. 일반적이고 추상적인 단어 금지
-
-절대 사용 금지:
-
-공부
-학습
-실행
-정리
-준비
-계획
-복습
-진행
-활동
-
-7. retrieval recall을 우선하라.
-
-관련 로그를 놓치는 것(False Negative)이
-약간의 노이즈(False Positive)보다 더 위험하다.
-
-8. priority_terms는 negative veto를 방어하는 역할을 한다.
-
-실제 관련 로그가 제거되지 않도록
-priority_terms를 충분히 다양하게 생성하라.
+5. 일반적이고 추상적인 단어 단독 사용 금지
+절대 "공부", "학습" 처럼 짧고 모호한 단어 하나만 내뱉지 마십시오. 대신 "알고리즘 공부", "파이썬 코딩" 처럼 구체적인 구문(Phrase)이나 앱 이름으로 출력하세요.
 
 ========================
 [출력 형식]
@@ -430,7 +343,7 @@ priority_terms를 충분히 다양하게 생성하라.
 
 JSON 외의 어떠한 설명도 출력하지 마라.
 
-{
+{{
 "goal_summary": "...",
 
 "core_intents": [
@@ -452,7 +365,7 @@ JSON 외의 어떠한 설명도 출력하지 마라.
 "negative_terms": [
 ...
 ]
-}
+}}
 """
 
 
@@ -568,23 +481,42 @@ def _call_gemini(goal: ResearchGoal, max_terms: int, gemini_config=None) -> dict
         title=goal.title,
         description=goal.description or goal.title,
     )
-    response_text = llm.generate(prompt)
+    
+    logger.info("=== [DEBUG] Gemini API Input Prompt ===")
+    logger.info(prompt[:500] + " ... (truncated)")
+    
+    try:
+        response_text = llm.generate(prompt)
+        logger.info("=== [DEBUG] Gemini API Response ===")
+        logger.info(response_text[:500] + " ... (truncated)")
+    except Exception as e:
+        logger.error(f"=== [DEBUG] Gemini API Error: {e} ===")
+        raise
 
-    # 1) markdown code-block: ```json ... ``` 또는 ``` ... ```
-    json_text: str | None = None
-    fence = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", response_text, re.DOTALL)
-    if fence:
-        json_text = fence.group(1)
-    else:
-        # 2) bare JSON object
-        bare = re.search(r"\{.*\}", response_text, re.DOTALL)
-        if bare:
-            json_text = bare.group()
-
-    if not json_text:
-        raise ValueError(f"No JSON in Gemini response: {response_text[:300]}")
-
-    parsed = json.loads(json_text)
+    # JSON 텍스트 추출을 위한 견고한 파싱 (마크다운 백틱 제거)
+    cleaned = response_text.strip()
+    if cleaned.startswith("```json"):
+        cleaned = cleaned[7:]
+    elif cleaned.startswith("```"):
+        cleaned = cleaned[3:]
+    if cleaned.endswith("```"):
+        cleaned = cleaned[:-3]
+        
+    cleaned = cleaned.strip()
+    
+    # 2차 방어선: 강제로 처음 { 와 마지막 } 사이의 문자열만 추출
+    start_idx = cleaned.find("{")
+    end_idx = cleaned.rfind("}")
+    if start_idx != -1 and end_idx != -1:
+        cleaned = cleaned[start_idx:end_idx+1]
+        
+    try:
+        parsed = json.loads(cleaned)
+        logger.info("=== [DEBUG] JSON Parsing Success ===")
+    except json.JSONDecodeError as e:
+        logger.error(f"=== [DEBUG] JSON Parsing Error: {e} ===")
+        logger.error(f"Cleaned Text: {cleaned[:500]}")
+        raise ValueError(f"JSON Parsing Error: {e} \nCleaned Text: {cleaned[:300]}")
 
     # Post-process all term lists
     evidence = _postprocess(parsed.get("evidence_terms", []), 0, max_terms)
@@ -684,6 +616,7 @@ def expand_goal_query(
                 parsed["negative_terms"],
             )
         except Exception as exc:
+            logger.error(f"=== [DEBUG] expand_goal_query Exception: {exc} ===")
             if use_mock_fallback:
                 logger.warning(
                     "Gemini expansion failed (%s) → heuristic fallback  goal=%s",

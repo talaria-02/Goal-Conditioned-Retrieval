@@ -35,16 +35,21 @@ def run_coach_pipeline(hours: float = 1.0):
     total_min = sum(s.total_duration_sec for s in sessions) / 60.0
 
     # 3. Match Goals
-    # (예시 목표들. 차후 파일이나 DB에서 불러오도록 확장 가능)
-    goals = [
-        ResearchGoal(goal_id="G1", user_id="u1", title="ROS2 로봇 프로젝트 완성", related_domains=["github.com"], related_apps=[], related_keywords=["ros2", "gazebo"]),
-        ResearchGoal(goal_id="G2", user_id="u1", title="AI 최적화 기법 과제", related_domains=["cyber.gachon.ac.kr"], related_apps=[], related_keywords=["LMS", "최적화"])
-    ]
     rule_store = UserRuleStore(Path(".cache/user_rules.json"))
+    goals = rule_store.get_all_goals()
+    
+    # 목표가 단 하나도 등록되어 있지 않은 초기 상태라면 기본값 세팅
+    if not goals:
+        default_goal1 = ResearchGoal(goal_id="G1", user_id="u1", title="ROS2 로봇 프로젝트 완성", related_domains=["github.com"], related_keywords=["ros2", "gazebo"])
+        default_goal2 = ResearchGoal(goal_id="G2", user_id="u1", title="AI 최적화 기법 과제", related_domains=["cyber.gachon.ac.kr"], related_keywords=["LMS", "최적화"])
+        rule_store.add_goal(default_goal1)
+        rule_store.add_goal(default_goal2)
+        goals = [default_goal1, default_goal2]
+
     matcher = GoalSessionMatcher(rule_store)
     
     # 백그라운드이므로 interactive=False 로 설정 (질문 없이 바로 넘어감)
-    results = matcher.match_sessions(goals, sessions, interactive=False)
+    results, unmatched = matcher.match_sessions(goals, sessions, interactive=False)
     
     # 4. 통계 추출 (Deep Work & Healthcare 추가)
     goal_stats = {}

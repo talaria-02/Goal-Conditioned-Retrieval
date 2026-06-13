@@ -226,6 +226,8 @@ def main() -> None:
         strength = r.log.metadata.get("evidence_strength", "-")
         reason = r.admission_reason or "-"
         print(f"  [{r.rank:2d}] score={r.final_score:.4f}  {r.log.date}  [{strength}]  {r.log.title}")
+        if r.log.content:
+            print(f"       content  : {r.log.content}")
         print(f"       admission: {reason}")
 
     if user_labels:

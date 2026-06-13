@@ -1,5 +1,7 @@
 from app.schemas import ResearchGoal, ActivitySession, MatchedSession
 from app.retrieval.user_rule_store import UserRuleStore
+from app.retrieval.query_understanding import build_query
+from app.retrieval.query_expansion import expand_goal_query
 
 class GoalSessionMatcher:
     def __init__(self, rule_store: UserRuleStore):
@@ -7,19 +9,35 @@ class GoalSessionMatcher:
 
     def match_sessions(
         self, goals: list[ResearchGoal], sessions: list[ActivitySession], interactive=True
-    ) -> dict[str, list[MatchedSession]]:
+    ) -> tuple[dict[str, list[MatchedSession]], list[ActivitySession]]:
         """
         주어진 세션들을 목표와 매칭합니다. 
         매칭되지 않은 중요한 세션은 터미널을 통해 사용자에게 인터랙티브하게 물어봅니다.
         """
         results = {g.goal_id: [] for g in goals}
         unmatched = []
+        valid_goal_ids = {g.goal_id for g in goals}
+        
+        # [NEW] 목표별로 AI Query Expansion (키워드 자동 증강) 캐싱
+        expanded_vocab = {}
+        for goal in goals:
+            try:
+                q_obj = build_query(goal)
+                # Gemini를 이용해 키워드 40~50개 자동 추출 (캐시된 경우 즉시 반환)
+                exp = expand_goal_query(goal, q_obj, use_cache=True)
+                # 세 가지 부류의 연관어들을 하나의 리스트로 합침
+                all_terms = exp.priority_terms + exp.expanded_terms + exp.related_terms
+                expanded_vocab[goal.goal_id] = [t.lower() for t in all_terms if len(t) > 1]
+            except Exception as e:
+                print(f"[{goal.title}] 키워드 자동 확장 실패: {e}")
+                expanded_vocab[goal.goal_id] = []
 
-        # 1. 룰 및 키워드 기반 매칭 시도
+        # 1. 룰 및 지능형 키워드 기반 매칭 시도
         for session in sessions:
-            matched_goal_id, reason = self._try_match(session, goals)
+            matched_goal_id, reason = self._try_match(session, goals, expanded_vocab)
             
-            if matched_goal_id:
+            # 매칭된 ID가 현재 유효한 목표 리스트에 존재하는지 검사 (삭제된 목표의 잔존 룰 방어)
+            if matched_goal_id and matched_goal_id in valid_goal_ids:
                 results[matched_goal_id].append(
                     MatchedSession(session=session, score=1.0, match_reason=reason)
                 )
@@ -30,9 +48,9 @@ class GoalSessionMatcher:
         if interactive and unmatched:
             self._interactive_learn(unmatched, goals, results)
 
-        return results
+        return results, unmatched
 
-    def _try_match(self, session: ActivitySession, goals: list[ResearchGoal]) -> tuple[str | None, str]:
+    def _try_match(self, session: ActivitySession, goals: list[ResearchGoal], expanded_vocab: dict) -> tuple[str | None, str]:
         # 1) 사용자가 이전에 등록한 Custom Rule 확인 (가장 우선순위 높음)
         if session.primary_domain:
             goal_id = self.rule_store.get_goal_for_domain(session.primary_domain)
@@ -41,17 +59,28 @@ class GoalSessionMatcher:
         goal_id = self.rule_store.get_goal_for_app(session.primary_app)
         if goal_id: return goal_id, "User Custom App Rule"
 
-        # 2) ResearchGoal에 명시된 하드코딩 Rule 확인
+        # 세션의 텍스트들을 하나의 덩어리로 합쳐서 검색 풀 생성
+        session_text_pool = f"{session.summary_text} {session.primary_domain} {session.primary_app} {' '.join(session.keywords)}".lower()
+        session_text_nospaces = session_text_pool.replace(" ", "")
+
+        # 2) AI가 자동 증강한 키워드(Query Expansion) 매칭
         for goal in goals:
+            # 먼저 기존 하드코딩된 앱/도메인 매칭 (호환성)
             if session.primary_domain in goal.related_domains:
                 return goal.goal_id, f"Hardcoded Domain ({session.primary_domain})"
             if session.primary_app in goal.related_apps:
                 return goal.goal_id, f"Hardcoded App ({session.primary_app})"
             
-            # 3) Keyword 매칭 (session.keywords와 goal.related_keywords 교집합)
-            overlap = set(session.keywords) & set(goal.related_keywords)
-            if overlap:
-                return goal.goal_id, f"Keyword Match ({list(overlap)[0]})"
+            # AI 확장 키워드 + 목표 제목 자체의 단어들도 검사
+            ai_terms = expanded_vocab.get(goal.goal_id, [])
+            title_terms = [t.lower() for t in goal.title.split() if len(t) > 1]
+            all_search_terms = set(ai_terms + title_terms)
+            
+            for term in all_search_terms:
+                term_nospaces = term.replace(" ", "")
+                # 일반 포함 여부 및 띄어쓰기 무시 포함 여부 검사
+                if term in session_text_pool or (len(term_nospaces) > 1 and term_nospaces in session_text_nospaces):
+                    return goal.goal_id, f"Keyword Match ({term})"
 
         return None, ""
 

@@ -33,8 +33,9 @@ def build_sessions(
         last_event = current_chunk[-1]
         gap = (event.timestamp - (last_event.timestamp + timedelta(seconds=last_event.duration))).total_seconds()
 
-        # If gap is smaller than merge_gap_sec, or if they overlap, merge them.
-        if gap <= merge_gap_sec:
+        # If gap is smaller than merge_gap_sec AND the app is the same, merge them.
+        # 앱이 달라지면 다른 작업으로 간주하여 세션을 강제로 분리합니다.
+        if gap <= merge_gap_sec and event.app == last_event.app:
             current_chunk.append(event)
         else:
             # Finalize current chunk
