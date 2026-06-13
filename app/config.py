@@ -53,7 +53,7 @@ class RetrievalConfig:
     candidate_size: int = 20
     top_k: int = 10
     random_seed: int = 42
-    dense_threshold: float = 0.85   # recall-focused: wider candidate net, precision handled by reranker
+    dense_threshold: float = 0.80   # recall-focused: wider candidate net, precision handled by reranker
 
 
 @dataclass

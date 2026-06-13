@@ -39,3 +39,9 @@ data/
 *.p12
 *.credentials
 .cache/
+
+# ActivityWatch CSV exports
+aw-events-export-*.csv
+
+# Logs
+*.log

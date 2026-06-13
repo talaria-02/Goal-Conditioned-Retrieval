@@ -21,6 +21,11 @@ class ResearchGoal:
     time_horizon: str = "mid_term"
     status: str = "active"
     created_at: str = ""
+    
+    # Time allocation analysis용 추가 필드
+    related_apps: list[str] = field(default_factory=list)
+    related_domains: list[str] = field(default_factory=list)
+    related_keywords: list[str] = field(default_factory=list)
 
     @property
     def query_text(self) -> str:
@@ -140,3 +145,63 @@ class CompressedEvidenceUnit:
     activity_cluster: str
     log_count: int = 1
     temporal_progression: str = ""
+
+@dataclass
+class ActivitySession:
+    """AW 이벤트를 시간 기반으로 병합한 활동 세션."""
+    session_id: str
+    start_time: str
+    end_time: str
+    total_duration_sec: float
+    
+    # 활동 분류
+    primary_app: str
+    primary_domain: str
+    activity_category: str
+    
+    # 메타데이터
+    urls: list[str]
+    titles: list[str]
+    app_breakdown: dict[str, float]
+    url_breakdown: dict[str, float]
+    
+    # 매칭용 텍스트
+    summary_text: str
+    keywords: list[str]
+
+    @property
+    def embedding_text(self) -> str:
+        """Dense retrieval용 텍스트."""
+        return f"{self.activity_category}: {self.summary_text}"
+
+
+@dataclass
+class MatchedSession:
+    """ResearchGoal과 매칭된 ActivitySession."""
+    session: ActivitySession
+    score: float
+    match_reason: str = ""
+
+
+@dataclass
+class GoalTimeAllocation:
+    """목표별 시간 할당 분석 결과."""
+    goal_id: str
+    goal_title: str
+    
+    # 시간 통계
+    total_time_sec: float
+    session_count: int
+    date_range: str
+    
+    # 세분화
+    sessions: list[MatchedSession]
+    app_time: dict[str, float]
+    domain_time: dict[str, float]
+    
+    # 패턴
+    daily_breakdown: dict[str, float]
+    focus_ratio: float
+    
+    # 미매칭
+    unmatched_time_sec: float = 0.0
