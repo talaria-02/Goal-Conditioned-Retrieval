@@ -27,6 +27,57 @@ st.set_page_config(page_title="AI 로그분석 대시보드", page_icon="🤖", 
 st.title("목표 기반 행동 리포트")
 st.markdown("지난 **24시간** 동안의 나의 컴퓨터 활동을 분석합니다.")
 
+import streamlit.components.v1 as components
+# 대시보드를 1분(60000ms)마다 자동 새로고침하여 백그라운드 프로세스의 업데이트를 반영
+components.html(
+    """
+    <script>
+    setTimeout(function(){
+        window.parent.location.reload();
+    }, 60000);
+    </script>
+    """,
+    height=0,
+    width=0
+)
+
+# --- Chrome(대시보드) 내부 실시간 알림 시스템 ---
+if "last_feedback_time" not in st.session_state:
+    st.session_state.last_feedback_time = None
+
+history_file = Path(".cache/coach_history.json")
+history_data = []
+if history_file.exists():
+    try:
+        history_data = json.loads(history_file.read_text(encoding="utf-8"))
+        if history_data:
+            latest_feedback = history_data[-1]
+            # 새로운 피드백이 감지되면 화면 우측 하단에 알림(Toast) 띄우기
+            if st.session_state.last_feedback_time != latest_feedback["timestamp"]:
+                st.session_state.last_feedback_time = latest_feedback["timestamp"]
+                # 첫 로딩이 아닐 때만 띄움
+                if st.session_state.last_feedback_time is not None:
+                    st.toast(latest_feedback["feedback"], icon="🔔")
+    except Exception:
+        pass
+
+# --- 최근 코칭 알림 기록 패널 ---
+with st.expander("📬 최근 AI 코칭 알림 기록 (최대 50개)", expanded=False):
+    if not history_data:
+        st.info("아직 수신된 코칭 피드백이 없습니다. 데몬(Daemon)이 작동 중인지 확인하세요.")
+    else:
+        for item in reversed(history_data):
+            try:
+                # ISO 문자열 파싱 후 예쁜 시간 포맷팅
+                dt = datetime.fromisoformat(item["timestamp"])
+                formatted_time = dt.strftime("%m월 %d일 %H:%M:%S")
+            except:
+                formatted_time = item["timestamp"]
+            st.markdown(f"**[{formatted_time}]**")
+            st.info(item["feedback"])
+            
+st.divider()
+
 # --- 사이드바: 목표 관리 UI ---
 st.sidebar.header("📝 목표(Goal) 관리")
 rule_store = UserRuleStore(Path(".cache/user_rules.json"))

@@ -124,6 +124,26 @@ def run_coach_pipeline(hours: float = 1.0):
         feedback = coach.generate_feedback(goal_stats, total_min, health_stats, past_context)
         print(f"\n💡 [AI 코치 피드백]\n{feedback}\n")
         
+        # [NEW] 대시보드와의 연동을 위해 코칭 기록을 파일에 저장
+        import json
+        from datetime import datetime
+        history_file = Path(".cache/coach_history.json")
+        history_data = []
+        if history_file.exists():
+            try:
+                history_data = json.loads(history_file.read_text(encoding="utf-8"))
+            except:
+                pass
+        
+        history_data.append({
+            "timestamp": datetime.now().isoformat(),
+            "feedback": feedback
+        })
+        # 최근 50개의 코칭 기록만 유지
+        history_data = history_data[-50:]
+        history_file.write_text(json.dumps(history_data, ensure_ascii=False, indent=2), encoding="utf-8")
+        
+        # 기존 Windows 로컬 알림 (plyer)
         show_toast_notification("🤖 실시간 AI 코치", feedback, duration=15)
         
     except Exception as e:
@@ -142,14 +162,14 @@ if __name__ == "__main__":
     
     if args.loop:
         import time
-        print(f"🔄 실시간 AI 코치 데몬 모드 시작 (실행 주기: {args.interval}분)")
+        print(f"[INFO] 실시간 AI 코치 데몬 모드 시작 (실행 주기: {args.interval}분)")
         while True:
             try:
                 run_coach_pipeline(hours=args.hours)
             except Exception as e:
-                print(f"❌ 파이프라인 실행 중 오류 발생: {e}")
+                print(f"[ERROR] 파이프라인 실행 중 오류 발생: {e}")
             
-            print(f"⏳ 다음 분석까지 {args.interval}분 대기 중...")
+            print(f"[WAIT] 다음 분석까지 {args.interval}분 대기 중...")
             time.sleep(args.interval * 60)
     else:
         run_coach_pipeline(hours=args.hours)
