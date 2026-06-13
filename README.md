@@ -59,55 +59,26 @@ ActivityWatch (localhost:5600)
 
 ---
 
-## Evidence Retrieval 엔진
+## 동적 텍스트 매칭 엔진 (Goal-Session Matcher)
 
+과거 복잡한 Dense/Lexical 혼합 수식을 벗어나, **로컬 환경에서의 실시간 속도와 정확도**를 위해 "지능형 키워드 매칭 + 사용자 맞춤형 룰 학습" 구조로 개편되었습니다.
+
+```text
+[입력] 목표(Goal) + 현재 활동 로그(Session)
+  │
+  ▼
+[AI 쿼리 확장] Gemini API를 이용한 하이브리드 키워드 생성
+  │  - 영문 원시 로그(앱/도메인) 50%
+  │  - 한글 행동 요약문(명사구) 50%
+  ▼
+[매칭 판별]
+  1순위: 사용자가 직접 지정한 도메인/앱 규칙 (User Custom Rules)
+  2순위: AI가 확장한 하이브리드 키워드가 Session 텍스트 풀에 포함되는지 검사
+  ▼
+[인터랙티브 학습]
+  매칭되지 않은 중요한 활동은 터미널에서 사용자에게 직접 물어보고,
+  새로운 도메인/앱 매칭 룰로 영구 저장 (Personalized Learning)
 ```
-Goal (ResearchGoal)
- │
- ▼
-[Stage 1] Candidate Retrieval
-  Gemini embedding-001 cosine similarity
-  dense_threshold = 0.85  (max-scaled)
- │
- ▼
-[Stage 1] Reranking
-  final_score = scale × (0.70×sem + 0.10×pri + 0.06×ev + 0.03×rel + 0.05×base)
-               − negative_penalty
-  Negative Veto  (domain conflict + no priority evidence → score=0)
- │
- ▼
-[Stage 1] Relevance Filtering
-  final_score ≥ 0.674  →  admitted
-  dynamic k  (top-k 고정 없음, threshold 통과 전체)
-```
-
-### Scoring Formula
-
-```
-scale       = 1 / (0.70 + 0.10 + 0.06 + 0.03 + 0.05) = 1.064
-
-relevance_score = scale × (
-    0.70 × semantic_similarity
-  + 0.10 × priority_phrase_score
-  + 0.06 × evidence_phrase_score
-  + 0.03 × related_score
-  + 0.05 × base_goal_overlap
-)
-
-final_score = max(0, relevance_score − negative_penalty)
-```
-
-### Validated Parameters
-
-| 파라미터 | 값 | 검증 방법 |
-|---|---|---|
-| `dense_threshold` | **0.85** | Step 5 / recall 우선 설계 |
-| `semantic_weight` | **0.70** | Step 3 — solo recall 0.757 |
-| `priority_weight` | **0.10** | Step 3 |
-| `evidence_weight` | **0.06** | Step 3 |
-| `related_weight` | **0.03** | Step 3 |
-| `base_weight` | **0.05** | Step 3 |
-| `relevance_threshold` | **0.674** | Step 5 — recall=precision 교차점 |
 
 ---
 
@@ -126,26 +97,18 @@ app/
     session_enricher.py               #   세션 메타데이터 추출
 
   retrieval/
-    dense_retriever.py                #   Gemini embedding-001 Dense retrieval
-    candidate_retrieval.py            #   Dense retrieval 진입점
-    reranker.py                       #   Lexical-control reranker + Negative Veto
-    query_expansion.py                #   구조화 어휘 확장
-    embedding_provider.py             #   Mock / Gemini / SentenceTransformer
-    goal_session_matcher.py           #   [신규] 목표-세션 매칭
-    session_history.py                #   [신규] 세션 히스토리 저장 + ResearchLog 변환
-    user_rule_store.py                #   [신규] 사용자 커스텀 매칭 룰
+    goal_session_matcher.py           #   [핵심] 동적 키워드 기반 목표-세션 매칭
+    query_expansion.py                #   [핵심] AI 하이브리드 어휘 확장
+    session_history.py                #   세션 히스토리 저장 및 관리
+    user_rule_store.py                #   사용자 커스텀 매칭 룰 (학습 데이터)
 
   llm/
-    llm_client.py                     #   LLM 인터페이스 (Mock / Gemini)
-    coach.py                          #   [신규] 실시간 AI 코칭 피드백 생성
-    analysis.py                       #   Goal progress 분석
+    llm_client.py                     #   LLM 인터페이스 연동
+    coach.py                          #   실시간 AI 코칭 피드백 생성
+    analysis.py                       #   활동 통계 요약
 
-  pipeline/
-    stage1_ranking_pipeline.py        #   Stage 1 retrieval pipeline
-    stage2_rag_pipeline.py            #   Stage 2 consolidation pipeline
-
-run_realtime_coach.py                 # [신규] 실시간 AI 코치 실행 (CLI)
-run_dashboard.py                      # [신규] Streamlit 대시보드 (Web UI)
+run_realtime_coach.py                 # [실행] 실시간 AI 코치 (CLI 백그라운드)
+run_dashboard.py                      # [실행] Streamlit 분석 대시보드 (Web UI)
 
 scripts/
   test_fetcher.py                     #   API 연결 테스트

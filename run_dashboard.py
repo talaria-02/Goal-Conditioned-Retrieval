@@ -22,10 +22,10 @@ from app.llm.coach import RealtimeCoach
 # 환경변수 로드
 load_dotenv()
 
-st.set_page_config(page_title="AI 행동 코치 대시보드", page_icon="🤖", layout="wide")
+st.set_page_config(page_title="AI 로그분석 대시보드", page_icon="🤖", layout="wide")
 
-st.title("🎯 목표기반 AI 코치: 일일 회고 대시보드")
-st.markdown("지난 **24시간** 동안의 나의 활동, 딥워크(연속 집중), 헬스케어 통계를 분석합니다.")
+st.title("목표 기반 행동 리포트")
+st.markdown("지난 **24시간** 동안의 나의 컴퓨터 활동을 분석합니다.")
 
 # --- 사이드바: 목표 관리 UI ---
 st.sidebar.header("📝 목표(Goal) 관리")
@@ -42,7 +42,7 @@ if not current_goals:
 
 st.sidebar.subheader("현재 등록된 목표")
 for g in current_goals:
-    with st.sidebar.expander(f"📌 {g.title}"):
+    with st.sidebar.expander(f"{g.title}"):
         st.caption(f"ID: {g.goal_id}")
         
         # 만약 과거에 등록해둔 수동 룰이 있다면 살짝만 표시
@@ -186,7 +186,7 @@ col1, col2, col3, col4 = st.columns(4)
 col1.metric("⏱️ 총 활동 시간", f"{total_min:.1f} 분")
 best_goal = max(goal_stats.items(), key=lambda x: x[1]["total_min"] if x[0] != "기타/휴식(매칭안됨)" else -1)
 col2.metric("🏆 가장 많이 한 목표", f"{best_goal[0]}", f"{best_goal[1]['total_min']:.1f} 분")
-col3.metric("🔥 딥워크 (최대 연속 집중)", f"{best_goal[1]['max_continuous_min']:.1f} 분", f"{best_goal[1]['session_count']}회 끊김", delta_color="inverse")
+col3.metric("🔥 최대 연속 집중시간", f"{best_goal[1]['max_continuous_min']:.1f} 분", f"{best_goal[1]['session_count']}회 끊김", delta_color="inverse")
 col4.metric("🧘 가장 길게 쉰 시간", f"{health_stats['max_single_afk_min']:.1f} 분")
 
 st.divider()
@@ -215,7 +215,7 @@ for goal in current_goals:
     if not matched:
         continue
         
-    with st.expander(f"📌 [{goal.title}] 에 합산된 기록들 ({len(matched)}개 세션)"):
+    with st.expander(f"[{goal.title}] 에 합산된 기록들 ({len(matched)}개 세션)"):
         # 표 형식으로 깔끔하게 정리하기 위해 리스트 생성
         log_data = []
         for m in reversed(matched):
